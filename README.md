@@ -108,14 +108,14 @@ python3 -m http.server 8000
 
 | ประเภท | ตัวอย่าง |
 | --- | --- |
-| ลิงก์ | `https://www.nstru.ac.th` |
-| Wi‑Fi | `WIFI:T:WPA;S:NSTRU-Guest;P:welcome2026;;` |
+| ลิงก์ | `https://example.com` |
+| Wi‑Fi | `WIFI:T:WPA;S:MyHome-WiFi;P:welcome2026;;` |
 | พร้อมเพย์ | `00020101021129370016A000000677010111011300668123456785802TH530376463045D82` |
 | อีเมล | `mailto:contact@example.com?subject=...` |
-| โทร | `tel:075377443` |
+| โทร | `tel:021234567` |
 | SMS | `SMSTO:0812345678:ข้อความ` |
 | นามบัตร | `BEGIN:VCARD` … `END:VCARD` |
-| ตำแหน่ง | `https://maps.google.com/?q=8.4304,99.9631` |
+| ตำแหน่ง | `https://maps.google.com/?q=13.7563,100.5018` |
 
 ## โครงสร้างโปรเจกต์
 
