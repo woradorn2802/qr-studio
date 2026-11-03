@@ -1,0 +1,741 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>[hidden]{display:none!important}body{margin:0}img{max-width:100%}</style>
+</head>
+<body>
+<title>QR Studio</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: two-pane workbench — controls in stacked panels on the left, a sticky "proof" of the QR on the right; stacks with the proof first on phones. */
+:root{
+  --bg:#EEF2F1; --surface:#FFFFFF; --sunk:#F5F8F7; --ink:#131A19; --muted:#5A6765; --line:#D6DEDC;
+  --accent:#0F766E; --accent-ink:#FFFFFF; --accent-soft:#DDF1EE;
+  --ok:#15803D; --ok-soft:#DCF5E4; --warn:#A35207; --warn-soft:#FDEFD9; --bad:#B42318; --bad-soft:#FCE4E2;
+  --chk1:#E7ECEB; --chk2:#F7F9F9;
+  --f-display:"Bai Jamjuree","IBM Plex Sans Thai",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans Thai",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0C1110; --surface:#141B1A; --sunk:#101615; --ink:#E5EDEB; --muted:#93A29F; --line:#26312F;
+  --accent:#2CC7B4; --accent-ink:#04201C; --accent-soft:#12302C;
+  --ok:#4ADE80; --ok-soft:#10301C; --warn:#F5A524; --warn-soft:#33240C; --bad:#F87171; --bad-soft:#3A1614;
+  --chk1:#1B2423; --chk2:#232E2D; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#0C1110; --surface:#141B1A; --sunk:#101615; --ink:#E5EDEB; --muted:#93A29F; --line:#26312F;
+  --accent:#2CC7B4; --accent-ink:#04201C; --accent-soft:#12302C;
+  --ok:#4ADE80; --ok-soft:#10301C; --warn:#F5A524; --warn-soft:#33240C; --bad:#F87171; --bad-soft:#3A1614;
+  --chk1:#1B2423; --chk2:#232E2D; color-scheme:dark;}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+header{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.mark{width:40px;height:40px;flex:none}
+header h1{font-family:var(--f-display);font-weight:700;font-size:26px;letter-spacing:-.01em;margin:0;line-height:1.1}
+header p{margin:0;color:var(--muted);font-size:14px}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:20px;align-items:start}
+@media (max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}.proof{order:-1;position:static!important}}
+.controls{display:flex;flex-direction:column;gap:14px;min-width:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.panel h2{font-family:var(--f-display);font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0;display:flex;align-items:center;gap:8px}
+.panel h2 b{font-family:var(--f-mono);font-weight:500;color:var(--accent);letter-spacing:0}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+label.f{display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--muted);min-width:0}
+label.f > span{display:flex;justify-content:space-between;gap:8px}
+label.f output{font-family:var(--f-mono);color:var(--ink);font-size:12px}
+input[type=text],input[type=url],input[type=email],input[type=tel],input[type=number],input[type=password],textarea,select{
+  font:inherit;font-size:15px;color:var(--ink);background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:9px 11px;width:100%;min-width:0}
+textarea{resize:vertical;min-height:96px}
+input:focus-visible,textarea:focus-visible,select:focus-visible,button:focus-visible,.chip:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+input[type=range]{width:100%;accent-color:var(--accent)}
+input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px;margin:0}
+.check{display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer}
+.hint{font-size:12.5px;color:var(--muted);margin:0}
+.err{font-size:13px;color:var(--bad);margin:0}
+
+/* segmented chips */
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{position:relative}
+.chip input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
+.chip span{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:999px;border:1px solid var(--line);background:var(--sunk);font-size:14px;cursor:pointer;white-space:nowrap}
+.chip input:checked + span{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.chip svg{width:16px;height:16px}
+.styles .chip span{border-radius:8px;flex-direction:column;gap:4px;padding:8px 10px;font-size:12.5px;min-width:72px}
+.styles .chip svg{width:30px;height:30px}
+
+.swatches{display:flex;flex-wrap:wrap;gap:8px}
+.sw{width:34px;height:34px;border-radius:8px;border:1px solid var(--line);cursor:pointer;padding:0;overflow:hidden;display:grid;grid-template-columns:1fr 1fr}
+.sw i{display:block}
+.colors{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.color{display:flex;align-items:center;gap:8px;background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:5px 8px 5px 5px;min-width:0}
+.color input[type=color]{width:32px;height:30px;border:none;padding:0;background:none;cursor:pointer;flex:none}
+.color input[type=text]{border:none;background:transparent;padding:4px;font-family:var(--f-mono);font-size:13px;text-transform:uppercase}
+
+.drop{border:1.5px dashed var(--line);border-radius:var(--r);padding:14px;display:flex;align-items:center;gap:14px;background:var(--sunk);flex-wrap:wrap}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop .thumb{width:56px;height:56px;border-radius:8px;background:repeating-conic-gradient(var(--chk1) 0 25%,var(--chk2) 0 50%) 0 0/12px 12px;display:grid;place-items:center;overflow:hidden;flex:none}
+.drop .thumb img{max-width:100%;max-height:100%}
+.drop .txt{flex:1;min-width:160px;font-size:13.5px;color:var(--muted)}
+.btn{font:inherit;font-size:14px;font-weight:500;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:8px 14px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.ghost{background:transparent}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+
+details.adv summary{cursor:pointer;font-family:var(--f-display);font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);list-style:none}
+details.adv summary::-webkit-details-marker{display:none}
+details.adv summary::before{content:"+ ";font-family:var(--f-mono);color:var(--accent)}
+details.adv[open] summary::before{content:"− "}
+details.adv[open] summary{margin-bottom:14px}
+
+/* proof */
+.proof{position:sticky;top:max(16px,env(safe-area-inset-top,0px));background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;display:flex;flex-direction:column;gap:14px}
+.stage{border-radius:8px;background:repeating-conic-gradient(var(--chk1) 0 25%,var(--chk2) 0 50%) 0 0/16px 16px;padding:22px;display:grid;place-items:center;min-height:240px}
+.stage canvas{width:100%;max-width:330px;height:auto;display:block;image-rendering:auto;box-shadow:0 1px 2px rgba(0,0,0,.08),0 8px 24px rgba(0,0,0,.08);border-radius:4px}
+.stage .empty{color:var(--muted);text-align:center;font-size:14px;max-width:240px}
+.status{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:8px;font-size:13.5px;line-height:1.45}
+.status .dot{width:9px;height:9px;border-radius:50%;margin-top:6px;flex:none;background:currentColor}
+.status.ok{background:var(--ok-soft);color:var(--ok)} .status.bad{background:var(--bad-soft);color:var(--bad)}
+.status.wait{background:var(--sunk);color:var(--muted)} .status.warn{background:var(--warn-soft);color:var(--warn)}
+.status strong{display:block;font-weight:600}
+.status span{color:var(--ink);opacity:.85}
+.meta{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.meta div{background:var(--sunk);padding:7px 8px;min-width:0}
+.meta dt{font-size:11px;color:var(--muted);letter-spacing:.04em}
+.meta dd{margin:0;font-family:var(--f-mono);font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.warns{display:flex;flex-direction:column;gap:6px;margin:0;padding:0;list-style:none}
+.warns li{font-size:13px;color:var(--warn);display:flex;gap:8px}
+.warns li::before{content:"!";font-family:var(--f-mono);font-weight:600;flex:none;width:16px;height:16px;border-radius:50%;background:var(--warn-soft);display:grid;place-items:center;font-size:11px;margin-top:2px}
+.dl{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.dl .btn{padding:9px 6px}
+.dl2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.payload{font-family:var(--f-mono);font-size:12px;background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:10px;white-space:pre-wrap;word-break:break-all;max-height:140px;overflow:auto;margin:0;color:var(--muted)}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:14px;opacity:0;pointer-events:none;transition:.2s;max-width:calc(100% - 32px);z-index:20}
+.toast.show{opacity:1;transform:translateX(-50%)}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+</style>
+
+<div class="wrap">
+  <header>
+    <svg class="mark" viewBox="0 0 40 40" aria-hidden="true">
+      <rect width="40" height="40" rx="9" fill="var(--accent)"/>
+      <g fill="none" stroke="var(--accent-ink)" stroke-width="2.4"><rect x="7.2" y="7.2" width="10" height="10" rx="2.5"/><rect x="22.8" y="7.2" width="10" height="10" rx="2.5"/><rect x="7.2" y="22.8" width="10" height="10" rx="2.5"/></g>
+      <g fill="var(--accent-ink)"><rect x="10.5" y="10.5" width="3.4" height="3.4" rx=".8"/><rect x="26.1" y="10.5" width="3.4" height="3.4" rx=".8"/><rect x="10.5" y="26.1" width="3.4" height="3.4" rx=".8"/><rect x="23" y="23" width="3.6" height="3.6" rx="1.8"/><rect x="29" y="29" width="3.6" height="3.6" rx="1.8"/><rect x="29" y="23" width="3.6" height="3.6" rx="1.8"/></g>
+    </svg>
+    <div>
+      <h1>QR Studio</h1>
+      <p>สร้าง QR Code สำหรับลิงก์ ข้อความ Wi‑Fi พร้อมเพย์ และนามบัตร ใส่โลโก้และปรับสีได้ ทุกอย่างทำงานในเบราว์เซอร์ของคุณ</p>
+    </div>
+  </header>
+
+  <div class="grid">
+    <form class="controls" id="form" autocomplete="off" onsubmit="return false">
+
+      <section class="panel" aria-labelledby="h-content">
+        <h2 id="h-content">เนื้อหา</h2>
+        <div class="chips" role="radiogroup" aria-label="ประเภทเนื้อหา" id="types">
+          <label class="chip"><input type="radio" name="type" id="t-url" value="url" checked><span>ลิงก์</span></label>
+          <label class="chip"><input type="radio" name="type" id="t-text" value="text"><span>ข้อความ</span></label>
+          <label class="chip"><input type="radio" name="type" id="t-wifi" value="wifi"><span>Wi‑Fi</span></label>
+          <label class="chip"><input type="radio" name="type" id="t-pp" value="promptpay"><span>พร้อมเพย์</span></label>
+          <label class="chip"><input type="radio" name="type" id="t-email" value="email"><span>อีเมล</span></label>
+          <label class="chip"><input type="radio" name="type" id="t-tel" value="tel"><span>โทร</span></label>
+          <label class="chip"><input type="radio" name="type" id="t-sms" value="sms"><span>SMS</span></label>
+          <label class="chip"><input type="radio" name="type" id="t-vcard" value="vcard"><span>นามบัตร</span></label>
+          <label class="chip"><input type="radio" name="type" id="t-geo" value="geo"><span>ตำแหน่ง</span></label>
+        </div>
+
+        <div class="fields" data-type="url">
+          <label class="f"><span>ลิงก์ (URL)</span><input type="url" id="url" value="https://www.nstru.ac.th" placeholder="https://example.com" inputmode="url"></label>
+          <p class="hint">ถ้าไม่ใส่ https:// ระบบจะเติมให้อัตโนมัติ</p>
+        </div>
+        <div class="fields" data-type="text" hidden>
+          <label class="f"><span>ข้อความ <output id="textCount">0</output></span><textarea id="text" placeholder="พิมพ์ข้อความภาษาไทยหรือภาษาอังกฤษ">สวัสดีครับ ยินดีต้อนรับสู่มหาวิทยาลัยราชภัฏนครศรีธรรมราช</textarea></label>
+        </div>
+        <div class="fields" data-type="wifi" hidden>
+          <div class="row">
+            <label class="f"><span>ชื่อเครือข่าย (SSID)</span><input type="text" id="wifiSsid" value="NSTRU-Guest"></label>
+            <label class="f"><span>รหัสผ่าน</span><input type="text" id="wifiPass" value="welcome2026"></label>
+          </div>
+          <div class="row">
+            <label class="f"><span>การเข้ารหัส</span><select id="wifiEnc"><option value="WPA">WPA/WPA2/WPA3</option><option value="WEP">WEP</option><option value="nopass">ไม่มีรหัสผ่าน</option></select></label>
+            <label class="check" style="align-self:end;padding-bottom:10px"><input type="checkbox" id="wifiHidden"> เครือข่ายซ่อนชื่อ</label>
+          </div>
+          <p class="hint">สแกนด้วยกล้องมือถือแล้วเชื่อมต่อได้ทันทีโดยไม่ต้องพิมพ์รหัส</p>
+        </div>
+        <div class="fields" data-type="promptpay" hidden>
+          <div class="row">
+            <label class="f"><span>เบอร์มือถือ / เลขบัตรประชาชน / e‑Wallet ID</span><input type="text" id="ppId" value="0812345678" inputmode="numeric"></label>
+            <label class="f"><span>จำนวนเงิน (บาท) ไม่บังคับ</span><input type="number" id="ppAmount" min="0" step="0.01" placeholder="ให้ผู้จ่ายกรอกเอง"></label>
+          </div>
+          <p class="hint">ใช้มาตรฐาน Thai QR Payment (EMVCo) สแกนได้กับแอปธนาคารไทยทุกแอป ควรทดลองโอนจำนวนเล็กน้อยก่อนนำไปใช้จริง</p>
+        </div>
+        <div class="fields" data-type="email" hidden>
+          <label class="f"><span>อีเมลผู้รับ</span><input type="email" id="emailTo" value="contact@example.com"></label>
+          <label class="f"><span>หัวเรื่อง</span><input type="text" id="emailSubject" value="สอบถามข้อมูล"></label>
+          <label class="f"><span>ข้อความ</span><textarea id="emailBody"></textarea></label>
+        </div>
+        <div class="fields" data-type="tel" hidden>
+          <label class="f"><span>เบอร์โทรศัพท์</span><input type="tel" id="telNum" value="075-377-443"></label>
+        </div>
+        <div class="fields" data-type="sms" hidden>
+          <label class="f"><span>เบอร์ผู้รับ</span><input type="tel" id="smsNum" value="0812345678"></label>
+          <label class="f"><span>ข้อความ</span><textarea id="smsBody">ขอรับข้อมูลเพิ่มเติม</textarea></label>
+        </div>
+        <div class="fields" data-type="vcard" hidden>
+          <div class="row">
+            <label class="f"><span>ชื่อ</span><input type="text" id="vcFirst" value="สมชาย"></label>
+            <label class="f"><span>นามสกุล</span><input type="text" id="vcLast" value="ใจดี"></label>
+          </div>
+          <div class="row">
+            <label class="f"><span>องค์กร</span><input type="text" id="vcOrg" value=""></label>
+            <label class="f"><span>ตำแหน่ง</span><input type="text" id="vcTitle" value=""></label>
+          </div>
+          <div class="row">
+            <label class="f"><span>โทรศัพท์</span><input type="tel" id="vcTel" value="0812345678"></label>
+            <label class="f"><span>อีเมล</span><input type="email" id="vcEmail" value=""></label>
+          </div>
+          <div class="row">
+            <label class="f"><span>เว็บไซต์</span><input type="url" id="vcUrl" value=""></label>
+            <label class="f"><span>ที่อยู่</span><input type="text" id="vcAdr" value=""></label>
+          </div>
+        </div>
+        <div class="fields" data-type="geo" hidden>
+          <div class="row">
+            <label class="f"><span>ละติจูด</span><input type="number" id="geoLat" step="any" value="8.4304"></label>
+            <label class="f"><span>ลองจิจูด</span><input type="number" id="geoLng" step="any" value="99.9631"></label>
+          </div>
+          <label class="check"><input type="checkbox" id="geoGmaps" checked> เปิดด้วยลิงก์ Google Maps (รองรับทุกเครื่อง)</label>
+        </div>
+        <p class="err" id="contentErr" hidden></p>
+      </section>
+
+      <section class="panel" aria-labelledby="h-shape">
+        <h2 id="h-shape">รูปทรง</h2>
+        <div class="f" style="display:flex;flex-direction:column;gap:6px"><span class="hint">ลายจุด</span>
+          <div class="chips styles" id="dotStyles"></div></div>
+        <div class="row">
+          <div class="f" style="display:flex;flex-direction:column;gap:6px"><span class="hint">กรอบมุม</span><div class="chips styles" id="eyeStyles"></div></div>
+          <div class="f" style="display:flex;flex-direction:column;gap:6px"><span class="hint">จุดกลางมุม</span><div class="chips styles" id="centerStyles"></div></div>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="h-color">
+        <h2 id="h-color">สี</h2>
+        <div class="swatches" id="presets" aria-label="ชุดสีสำเร็จรูป"></div>
+        <div class="colors">
+          <label class="f"><span>สีลาย</span><div class="color"><input type="color" id="fg" value="#0f3d3a"><input type="text" id="fgHex" value="#0F3D3A" maxlength="7" aria-label="รหัสสีลาย"></div></label>
+          <label class="f"><span>สีพื้นหลัง</span><div class="color"><input type="color" id="bg" value="#ffffff"><input type="text" id="bgHex" value="#FFFFFF" maxlength="7" aria-label="รหัสสีพื้นหลัง"></div></label>
+        </div>
+        <label class="check"><input type="checkbox" id="transparent"> พื้นหลังโปร่งใส (PNG, SVG, WebP)</label>
+        <div class="row">
+          <label class="f"><span>ไล่เฉดสี</span><select id="grad"><option value="none">ไม่ใช้</option><option value="h">แนวนอน</option><option value="v">แนวตั้ง</option><option value="d">แนวทแยง</option><option value="r">วงกลมจากกลาง</option></select></label>
+          <label class="f" id="fg2Wrap" hidden><span>สีที่สอง</span><div class="color"><input type="color" id="fg2" value="#0f766e"><input type="text" id="fg2Hex" value="#0F766E" maxlength="7" aria-label="รหัสสีที่สอง"></div></label>
+        </div>
+        <label class="check"><input type="checkbox" id="eyeCustom"> ใช้สีแยกสำหรับมุมทั้งสาม</label>
+        <div class="colors" id="eyeColors" hidden>
+          <label class="f"><span>สีกรอบมุม</span><div class="color"><input type="color" id="eyeFrameC" value="#0f766e"><input type="text" id="eyeFrameHex" value="#0F766E" maxlength="7" aria-label="รหัสสีกรอบมุม"></div></label>
+          <label class="f"><span>สีจุดกลางมุม</span><div class="color"><input type="color" id="eyeCenterC" value="#0f3d3a"><input type="text" id="eyeCenterHex" value="#0F3D3A" maxlength="7" aria-label="รหัสสีจุดกลางมุม"></div></label>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="h-logo">
+        <h2 id="h-logo">โลโก้</h2>
+        <div class="drop" id="drop">
+          <div class="thumb" id="logoThumb"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg></div>
+          <div class="txt" id="logoTxt">ลากไฟล์รูปมาวาง วางจากคลิปบอร์ด (Ctrl+V) หรือเลือกไฟล์ PNG, JPG, SVG</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <label class="btn primary" for="logoFile">เลือกไฟล์</label>
+            <input type="file" id="logoFile" accept="image/*" class="sr">
+            <button type="button" class="btn" id="logoSample">โลโก้ตัวอย่าง</button>
+            <button type="button" class="btn ghost" id="logoRemove" hidden>เอาออก</button>
+          </div>
+        </div>
+        <div id="logoOpts" hidden style="display:flex;flex-direction:column;gap:12px">
+          <div class="row">
+            <label class="f"><span>ขนาดโลโก้ <output id="logoSizeOut">22%</output></span><input type="range" id="logoSize" min="10" max="30" value="22"></label>
+            <label class="f"><span>ระยะขอบรอบโลโก้ <output id="logoPadOut">1</output></span><input type="range" id="logoPad" min="0" max="3" step="0.5" value="1"></label>
+          </div>
+          <div class="row">
+            <label class="f"><span>แผ่นรองโลโก้</span><select id="logoPlate"><option value="rounded">สี่เหลี่ยมมุมมน</option><option value="square">สี่เหลี่ยม</option><option value="circle">วงกลม</option><option value="none">ไม่มี</option></select></label>
+            <label class="check" style="align-self:end;padding-bottom:10px"><input type="checkbox" id="logoClear" checked> เว้นลายจุดด้านหลังโลโก้</label>
+          </div>
+          <p class="hint">เมื่อใส่โลโก้ ระบบจะใช้ระดับแก้ไขข้อผิดพลาด H (กู้คืนได้ราว 30%) โดยอัตโนมัติ</p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <details class="adv" id="advanced">
+          <summary>ข้อความใต้ภาพและการตั้งค่าขั้นสูง</summary>
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <label class="f"><span>ข้อความใต้ QR (ไม่บังคับ)</span><input type="text" id="label" placeholder="เช่น สแกนเพื่อเข้าเว็บไซต์" maxlength="60"></label>
+            <div class="row">
+              <label class="f"><span>ระดับแก้ไขข้อผิดพลาด</span><select id="ecl"><option value="auto">อัตโนมัติ</option><option value="L">L · กู้คืน ~7%</option><option value="M">M · กู้คืน ~15%</option><option value="Q">Q · กู้คืน ~25%</option><option value="H">H · กู้คืน ~30%</option></select></label>
+              <label class="f"><span>ขอบว่าง (quiet zone) <output id="marginOut">4 โมดูล</output></span><input type="range" id="margin" min="0" max="8" value="4"></label>
+            </div>
+            <label class="f"><span>ขนาดไฟล์ภาพ</span><select id="size"><option value="512">512 × 512 px · เว็บ/แชต</option><option value="1024" selected>1024 × 1024 px · ทั่วไป</option><option value="2048">2048 × 2048 px · งานพิมพ์</option><option value="4096">4096 × 4096 px · ป้ายขนาดใหญ่</option></select></label>
+            <p class="hint">สำหรับงานพิมพ์ แนะนำไฟล์ SVG ซึ่งขยายได้ไม่จำกัดโดยไม่แตก</p>
+          </div>
+        </details>
+      </section>
+    </form>
+
+    <aside class="proof" aria-label="ตัวอย่าง QR Code">
+      <div class="stage" id="stage"><canvas id="preview" width="660" height="660" aria-label="ภาพตัวอย่าง QR Code" role="img"></canvas><div class="empty" id="empty" hidden>กรอกเนื้อหาทางซ้ายเพื่อสร้าง QR Code</div></div>
+      <div class="status wait" id="status"><i class="dot"></i><div><strong id="statusT">กำลังตรวจการสแกน…</strong><span id="statusD"></span></div></div>
+      <dl class="meta">
+        <div><dt>เวอร์ชัน</dt><dd id="mVer">–</dd></div>
+        <div><dt>โมดูล</dt><dd id="mMod">–</dd></div>
+        <div><dt>ECC</dt><dd id="mEcc">–</dd></div>
+        <div><dt>ข้อมูล</dt><dd id="mBytes">–</dd></div>
+      </dl>
+      <ul class="warns" id="warns"></ul>
+      <div class="dl">
+        <button type="button" class="btn primary" data-fmt="png">PNG</button>
+        <button type="button" class="btn" data-fmt="svg">SVG</button>
+        <button type="button" class="btn" data-fmt="jpg">JPG</button>
+        <button type="button" class="btn" data-fmt="webp">WebP</button>
+      </div>
+      <div class="dl2">
+        <button type="button" class="btn" id="copyImg">คัดลอกรูปภาพ</button>
+        <button type="button" class="btn" id="copyText">คัดลอกข้อมูล</button>
+      </div>
+      <details class="adv"><summary>ข้อมูลที่เข้ารหัส</summary><pre class="payload" id="payload"></pre></details>
+    </aside>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const val = id => document.getElementById(id).value;
+const chk = id => document.getElementById(id).checked;
+
+/* ---------- style pickers ---------- */
+const DOTS = [['square','สี่เหลี่ยม'],['rounded','มนต่อเนื่อง'],['dots','จุดกลม'],['soft','มนแยก'],['leaf','ใบไม้'],['diamond','ข้าวหลามตัด']];
+const EYES = [['square','เหลี่ยม'],['rounded','มน'],['circle','กลม'],['leaf','ใบไม้']];
+const CENTERS = [['square','เหลี่ยม'],['rounded','มน'],['circle','กลม'],['leaf','ใบไม้']];
+const sample = [[1,1,0,1],[1,0,1,1],[0,1,1,0],[1,1,0,1]];
+function chipSvg(kind, style){
+  let d='';
+  if(kind==='dot'){ const g={n:4,dark:(r,c)=>r>=0&&c>=0&&r<4&&c<4&&!!sample[r][c]}; for(let r=0;r<4;r++)for(let c=0;c<4;c++) if(g.dark(r,c)) d+=modulePath(style,c,r,g.dark); return `<svg viewBox="-.3 -.3 4.6 4.6"><path d="${d}" fill="currentColor"/></svg>`; }
+  if(kind==='eye') return `<svg viewBox="-.5 -.5 8 8"><path d="${framePath(style,0,0)}" fill="currentColor" fill-rule="evenodd"/><path d="${centerPath('square',0,0)}" fill="currentColor" opacity=".35"/></svg>`;
+  return `<svg viewBox="-.5 -.5 8 8"><path d="${framePath('square',0,0)}" fill="currentColor" fill-rule="evenodd" opacity=".35"/><path d="${centerPath(style,0,0)}" fill="currentColor"/></svg>`;
+}
+function buildChips(el, name, list, kind, def){
+  el.innerHTML = list.map(([v,l])=>`<label class="chip"><input type="radio" name="${name}" id="${name}-${v}" value="${v}" ${v===def?'checked':''}><span>${chipSvg(kind,v)}${l}</span></label>`).join('');
+}
+
+/* ---------- geometry (module units) ---------- */
+const n2 = x => +x.toFixed(3);
+function rr(x,y,w,h,tl,tr,br,bl){
+  // rounded rect with per-corner radii
+  let p=`M${n2(x+tl)} ${n2(y)}H${n2(x+w-tr)}`;
+  if(tr) p+=`A${tr} ${tr} 0 0 1 ${n2(x+w)} ${n2(y+tr)}`;
+  p+=`V${n2(y+h-br)}`; if(br) p+=`A${br} ${br} 0 0 1 ${n2(x+w-br)} ${n2(y+h)}`;
+  p+=`H${n2(x+bl)}`; if(bl) p+=`A${bl} ${bl} 0 0 1 ${n2(x)} ${n2(y+h-bl)}`;
+  p+=`V${n2(y+tl)}`; if(tl) p+=`A${tl} ${tl} 0 0 1 ${n2(x+tl)} ${n2(y)}`;
+  return p+'Z';
+}
+const circ = (cx,cy,r) => `M${n2(cx-r)} ${n2(cy)}a${r} ${r} 0 1 0 ${n2(2*r)} 0a${r} ${r} 0 1 0 ${n2(-2*r)} 0Z`;
+function modulePath(style,x,y,dark){
+  // x = column, y = row in grid; dark(r,c) neighbour test
+  switch(style){
+    case 'dots': return circ(x+.5,y+.5,.48);
+    case 'soft': return rr(x+.07,y+.07,.86,.86,.28,.28,.28,.28);
+    case 'leaf': return rr(x+.04,y+.04,.92,.92,.42,0,.42,0);
+    case 'diamond': return `M${x+.5} ${n2(y-.12)}L${n2(x+1.12)} ${y+.5}L${x+.5} ${n2(y+1.12)}L${n2(x-.12)} ${y+.5}Z`;
+    case 'rounded': {
+      const t=dark(y-1,x), b=dark(y+1,x), l=dark(y,x-1), r=dark(y,x+1), R=.5;
+      return rr(x,y,1,1, (!t&&!l)?R:0, (!t&&!r)?R:0, (!b&&!r)?R:0, (!b&&!l)?R:0);
+    }
+    default: return `M${x} ${y}h1v1h-1Z`;
+  }
+}
+function framePath(style,x,y){
+  switch(style){
+    case 'rounded': return rr(x,y,7,7,2.2,2.2,2.2,2.2)+rr(x+1,y+1,5,5,1.3,1.3,1.3,1.3);
+    case 'circle': return circ(x+3.5,y+3.5,3.5)+circ(x+3.5,y+3.5,2.5);
+    case 'leaf': return rr(x,y,7,7,3,0,3,0)+rr(x+1,y+1,5,5,2,0,2,0);
+    default: return rr(x,y,7,7,0,0,0,0)+rr(x+1,y+1,5,5,0,0,0,0);
+  }
+}
+function centerPath(style,x,y){
+  const cx=x+2, cy=y+2;
+  switch(style){
+    case 'rounded': return rr(cx,cy,3,3,.9,.9,.9,.9);
+    case 'circle': return circ(cx+1.5,cy+1.5,1.5);
+    case 'leaf': return rr(cx,cy,3,3,1.4,0,1.4,0);
+    default: return rr(cx,cy,3,3,0,0,0,0);
+  }
+}
+
+/* ---------- payload builders ---------- */
+const tlvF = (id,v) => id + String(v.length).padStart(2,'0') + v;
+function crc16(s){ let c=0xFFFF; for(let i=0;i<s.length;i++){ c^=s.charCodeAt(i)<<8; for(let j=0;j<8;j++){ c = (c&0x8000)?((c<<1)^0x1021):(c<<1); c&=0xFFFF; } } return c.toString(16).toUpperCase().padStart(4,'0'); }
+function promptpay(raw, amount){
+  const d = raw.replace(/\D/g,'');
+  let tag, v;
+  if(d.length===10 && d[0]==='0'){ tag='01'; v=('0066'+d.slice(1)); }
+  else if(d.length===13){ tag='02'; v=d; }
+  else if(d.length===15){ tag='03'; v=d; }
+  else throw new Error('กรอกเบอร์มือถือ 10 หลัก เลขบัตรประชาชน 13 หลัก หรือ e‑Wallet ID 15 หลัก');
+  const amt = amount ? Number(amount) : 0;
+  if(amount && !(amt>0)) throw new Error('จำนวนเงินต้องมากกว่า 0');
+  let p = tlvF('00','01') + tlvF('01', amt?'12':'11') + tlvF('29', tlvF('00','A000000677010111')+tlvF(tag,v)) + tlvF('58','TH') + tlvF('53','764');
+  if(amt) p += tlvF('54', amt.toFixed(2));
+  p += '6304';
+  return p + crc16(p);
+}
+const wEsc = s => s.replace(/([\\;,:"])/g,'\\$1');
+const vEsc = s => s.replace(/([\\,;])/g,'\\$1').replace(/\r?\n/g,'\\n');
+function buildPayload(type){
+  switch(type){
+    case 'url': { let u=val('url').trim(); if(!u) return ''; if(!/^[a-z][a-z0-9+.-]*:/i.test(u)) u='https://'+u; return u; }
+    case 'text': return val('text');
+    case 'wifi': { const s=val('wifiSsid'); if(!s) return ''; const e=val('wifiEnc');
+      return `WIFI:T:${e};S:${wEsc(s)};${e!=='nopass'?`P:${wEsc(val('wifiPass'))};`:''}${chk('wifiHidden')?'H:true;':''};`; }
+    case 'promptpay': { if(!val('ppId').trim()) return ''; return promptpay(val('ppId'), val('ppAmount')); }
+    case 'email': { const to=val('emailTo').trim(); if(!to) return ''; const q=[];
+      if(val('emailSubject')) q.push('subject='+encodeURIComponent(val('emailSubject')));
+      if(val('emailBody')) q.push('body='+encodeURIComponent(val('emailBody')));
+      return 'mailto:'+to+(q.length?'?'+q.join('&'):''); }
+    case 'tel': { const t=val('telNum').replace(/[^\d+]/g,''); return t?'tel:'+t:''; }
+    case 'sms': { const t=val('smsNum').replace(/[^\d+]/g,''); if(!t) return ''; return `SMSTO:${t}:${val('smsBody')}`; }
+    case 'vcard': { const f=val('vcFirst'), l=val('vcLast'); if(!f && !l && !val('vcTel')) return '';
+      const L=['BEGIN:VCARD','VERSION:3.0',`N:${vEsc(l)};${vEsc(f)};;;`,`FN:${vEsc((f+' '+l).trim())}`];
+      if(val('vcOrg')) L.push('ORG:'+vEsc(val('vcOrg')));
+      if(val('vcTitle')) L.push('TITLE:'+vEsc(val('vcTitle')));
+      if(val('vcTel')) L.push('TEL;TYPE=CELL:'+val('vcTel').replace(/[^\d+]/g,''));
+      if(val('vcEmail')) L.push('EMAIL:'+val('vcEmail').trim());
+      if(val('vcUrl')) L.push('URL:'+val('vcUrl').trim());
+      if(val('vcAdr')) L.push('ADR:;;'+vEsc(val('vcAdr'))+';;;;');
+      L.push('END:VCARD'); return L.join('\r\n'); }
+    case 'geo': { const a=val('geoLat'), b=val('geoLng'); if(a===''||b==='') return '';
+      const la=+a, lo=+b; if(Math.abs(la)>90||Math.abs(lo)>180) throw new Error('ละติจูดต้องอยู่ระหว่าง −90 ถึง 90 และลองจิจูดระหว่าง −180 ถึง 180');
+      return chk('geoGmaps') ? `https://maps.google.com/?q=${la},${lo}` : `geo:${la},${lo}`; }
+  }
+  return '';
+}
+
+/* ---------- QR matrix ---------- */
+function makeQR(payload, ecl){
+  const bytes = new TextEncoder().encode(payload);
+  let bin=''; for(const b of bytes) bin+=String.fromCharCode(b);
+  const q = qrcode(0, ecl); q.addData(bin, 'Byte'); q.make();
+  const n = q.getModuleCount();
+  const m = []; for(let r=0;r<n;r++){ const row=[]; for(let c=0;c<n;c++) row.push(q.isDark(r,c)); m.push(row); }
+  return { n, m, bytes, version:(n-17)/4, ecl };
+}
+
+/* ---------- options ---------- */
+function readOpts(){
+  const logo = state.logoImg;
+  const eclSel = val('ecl');
+  return {
+    dot: document.querySelector('input[name=dot]:checked').value,
+    eye: document.querySelector('input[name=eye]:checked').value,
+    center: document.querySelector('input[name=center]:checked').value,
+    fg: val('fg'), fg2: val('fg2'), bg: val('bg'), transparent: chk('transparent'), grad: val('grad'),
+    eyeCustom: chk('eyeCustom'), eyeFrame: val('eyeFrameC'), eyeCenter: val('eyeCenterC'),
+    logo, logoSrc: state.logoSrc, logoSize: +val('logoSize')/100, logoPad: +val('logoPad'), logoPlate: val('logoPlate'), logoClear: chk('logoClear'),
+    ecl: eclSel==='auto' ? (logo?'H':'M') : eclSel,
+    margin: +val('margin'), label: val('label').trim(), size: +val('size'),
+  };
+}
+
+/* ---------- scene: shared by SVG and canvas ---------- */
+function scene(qr, o){
+  const {n,m:M} = qr, mg=o.margin, T=n+2*mg;
+  const finder = (r,c) => (r<7&&c<7)||(r<7&&c>=n-7)||(r>=n-7&&c<7);
+  let plate=null, img=null;
+  if(o.logo){
+    const ls = n*o.logoSize, p0=(n-ls)/2, pad=o.logoPad;
+    plate = {x:mg+p0-pad, y:mg+p0-pad, w:ls+2*pad};
+    const ar = o.logo.naturalWidth/o.logo.naturalHeight || 1;
+    const iw = ar>=1?ls:ls*ar, ih = ar>=1?ls/ar:ls;
+    img = {x:mg+(n-iw)/2, y:mg+(n-ih)/2, w:iw, h:ih};
+  }
+  const hidden = (r,c) => {
+    if(finder(r,c)) return true;
+    if(plate && o.logoClear){ const x=c+mg, y=r+mg; if(x+1>plate.x && x<plate.x+plate.w && y+1>plate.y && y<plate.y+plate.w) return true; }
+    return false;
+  };
+  const dark = (r,c) => r>=0&&c>=0&&r<n&&c<n&&M[r][c]&&!hidden(r,c);
+  let dots='';
+  for(let r=0;r<n;r++) for(let c=0;c<n;c++) if(dark(r,c)) dots+=modulePath(o.dot, c+mg, r+mg, (rr_,cc_)=>dark(rr_-mg,cc_-mg));
+  let frames='', centers='';
+  for(const [r0,c0] of [[0,0],[0,n-7],[n-7,0]]){ frames+=framePath(o.eye,c0+mg,r0+mg); centers+=centerPath(o.center,c0+mg,r0+mg); }
+  let fs=0, H=T;
+  if(o.label){ fs = Math.max(1.6, T*0.068); H = T + fs*1.7; }
+  // gradient geometry
+  const cx=mg+n/2, cy=mg+n/2, h=n/2;
+  let g=null;
+  if(o.grad!=='none'){
+    if(o.grad==='r') g={type:'r',cx,cy,r:h*1.42};
+    else { const a = o.grad==='h'?0:o.grad==='v'?90:45, rad=a*Math.PI/180, dx=Math.cos(rad)*h, dy=Math.sin(rad)*h;
+      g={type:'l',x1:cx-dx,y1:cy-dy,x2:cx+dx,y2:cy+dy}; }
+  }
+  return {T,H,dots,frames,centers,plate,img,fs,g};
+}
+
+function plateD(p,shape){
+  if(shape==='circle') return circ(p.x+p.w/2,p.y+p.w/2,p.w/2*1.06);
+  const r = shape==='rounded'? p.w*0.2 : 0;
+  return rr(p.x,p.y,p.w,p.w,r,r,r,r);
+}
+const esc = s => s.replace(/[&<>"]/g, ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+
+function toSVG(sc,o){
+  const W=o.size, Hpx=Math.round(W*sc.H/sc.T);
+  const fgPaint = sc.g ? 'url(#g)' : o.fg;
+  let defs='';
+  if(sc.g){
+    defs = sc.g.type==='r'
+      ? `<radialGradient id="g" gradientUnits="userSpaceOnUse" cx="${n2(sc.g.cx)}" cy="${n2(sc.g.cy)}" r="${n2(sc.g.r)}"><stop offset="0" stop-color="${o.fg2}"/><stop offset="1" stop-color="${o.fg}"/></radialGradient>`
+      : `<linearGradient id="g" gradientUnits="userSpaceOnUse" x1="${n2(sc.g.x1)}" y1="${n2(sc.g.y1)}" x2="${n2(sc.g.x2)}" y2="${n2(sc.g.y2)}"><stop offset="0" stop-color="${o.fg}"/><stop offset="1" stop-color="${o.fg2}"/></linearGradient>`;
+  }
+  const fc = o.eyeCustom?o.eyeFrame:fgPaint, cc = o.eyeCustom?o.eyeCenter:fgPaint;
+  let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${Hpx}" viewBox="0 0 ${sc.T} ${n2(sc.H)}" shape-rendering="geometricPrecision">`;
+  if(defs) s+=`<defs>${defs}</defs>`;
+  if(!o.transparent) s+=`<rect width="${sc.T}" height="${n2(sc.H)}" fill="${o.bg}"/>`;
+  s+=`<path d="${sc.dots}" fill="${fgPaint}"/>`;
+  s+=`<path d="${sc.frames}" fill="${fc}" fill-rule="evenodd"/>`;
+  s+=`<path d="${sc.centers}" fill="${cc}"/>`;
+  if(sc.plate && o.logoPlate!=='none') s+=`<path d="${plateD(sc.plate,o.logoPlate)}" fill="${o.transparent?'#FFFFFF':o.bg}"/>`;
+  if(sc.img) s+=`<image href="${o.logoSrc}" x="${n2(sc.img.x)}" y="${n2(sc.img.y)}" width="${n2(sc.img.w)}" height="${n2(sc.img.h)}" preserveAspectRatio="xMidYMid meet"/>`;
+  if(o.label) s+=`<text x="${sc.T/2}" y="${n2(sc.T+sc.fs*0.45)}" text-anchor="middle" dominant-baseline="middle" font-family="IBM Plex Sans Thai, Tahoma, sans-serif" font-weight="600" font-size="${n2(sc.fs)}" fill="${o.fg}">${esc(o.label)}</text>`;
+  return s+'</svg>';
+}
+
+function paint(canvas, sc, o, W, {forceBg=null}={}){
+  const Hpx = Math.round(W*sc.H/sc.T);
+  canvas.width=W; canvas.height=Hpx;
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,W,Hpx);
+  const k=W/sc.T; ctx.setTransform(k,0,0,k,0,0);
+  if(forceBg || !o.transparent){ ctx.fillStyle = (o.transparent && forceBg) ? forceBg : o.bg; ctx.fillRect(0,0,sc.T,sc.H); }
+  let fgPaint=o.fg;
+  if(sc.g){
+    if(sc.g.type==='r'){ fgPaint=ctx.createRadialGradient(sc.g.cx,sc.g.cy,0,sc.g.cx,sc.g.cy,sc.g.r); fgPaint.addColorStop(0,o.fg2); fgPaint.addColorStop(1,o.fg); }
+    else { fgPaint=ctx.createLinearGradient(sc.g.x1,sc.g.y1,sc.g.x2,sc.g.y2); fgPaint.addColorStop(0,o.fg); fgPaint.addColorStop(1,o.fg2); }
+  }
+  if(sc.dots){ ctx.fillStyle=fgPaint; ctx.fill(new Path2D(sc.dots)); }
+  ctx.fillStyle = o.eyeCustom?o.eyeFrame:fgPaint; ctx.fill(new Path2D(sc.frames),'evenodd');
+  ctx.fillStyle = o.eyeCustom?o.eyeCenter:fgPaint; ctx.fill(new Path2D(sc.centers));
+  if(sc.plate && o.logoPlate!=='none'){ ctx.fillStyle = o.transparent?'#FFFFFF':o.bg; ctx.fill(new Path2D(plateD(sc.plate,o.logoPlate))); }
+  if(sc.img){ ctx.imageSmoothingQuality='high'; ctx.drawImage(o.logo, sc.img.x, sc.img.y, sc.img.w, sc.img.h); }
+  if(o.label){
+    let fs=sc.fs; ctx.fillStyle=o.fg; ctx.textAlign='center'; ctx.textBaseline='middle';
+    const font = s => `600 ${s}px "IBM Plex Sans Thai", Tahoma, sans-serif`;
+    ctx.font=font(fs); const w=ctx.measureText(o.label).width; if(w>sc.T*0.92){ fs*=sc.T*0.92/w; ctx.font=font(fs); }
+    ctx.fillText(o.label, sc.T/2, sc.T+sc.fs*0.45);
+  }
+}
+
+/* ---------- colour checks ---------- */
+function lum(hex){ const v=hex.replace('#',''); const c=[0,2,4].map(i=>parseInt(v.substr(i,2),16)/255).map(x=>x<=.03928?x/12.92:Math.pow((x+.055)/1.055,2.4)); return .2126*c[0]+.7152*c[1]+.0722*c[2]; }
+const contrast = (a,b) => { const A=lum(a), B=lum(b); return (Math.max(A,B)+.05)/(Math.min(A,B)+.05); };
+
+/* ---------- state + render ---------- */
+const state = { logoImg:null, logoSrc:null, logoName:'', qr:null, sc:null, opts:null, payload:'', verifyTimer:0 };
+const cv = $('#preview');
+let raf=0;
+const schedule = () => { cancelAnimationFrame(raf); raf=requestAnimationFrame(render); };
+
+function setStatus(kind, t, d=''){ const s=$('#status'); s.className='status '+kind; $('#statusT').textContent=t; $('#statusD').textContent=d; }
+
+function render(){
+  const type = document.querySelector('input[name=type]:checked').value;
+  document.querySelectorAll('.fields').forEach(f=>f.hidden = f.dataset.type!==type);
+  $('#textCount').textContent = val('text').length + ' ตัวอักษร';
+  $('#fg2Wrap').hidden = val('grad')==='none';
+  $('#eyeColors').hidden = !chk('eyeCustom');
+  $('#logoSizeOut').textContent = val('logoSize')+'%';
+  $('#logoPadOut').textContent = val('logoPad')+' โมดูล';
+  $('#marginOut').textContent = val('margin')+' โมดูล';
+  const err=$('#contentErr'); err.hidden=true;
+  let payload='';
+  try{ payload = buildPayload(type); } catch(e){ err.textContent=e.message; err.hidden=false; }
+  const o = readOpts();
+  state.payload = payload; $('#payload').textContent = payload || '—';
+  const dlBtns = document.querySelectorAll('.dl .btn, #copyImg, #copyText');
+  if(!payload){
+    cv.hidden=true; $('#empty').hidden=false; dlBtns.forEach(b=>b.disabled=true);
+    ['mVer','mMod','mEcc','mBytes'].forEach(i=>$('#'+i).textContent='–'); $('#warns').innerHTML='';
+    setStatus('wait', err.hidden?'ยังไม่มีเนื้อหา':'ตรวจข้อมูลอีกครั้ง', err.hidden?'กรอกข้อมูลเพื่อเริ่มสร้าง QR Code':''); state.qr=null; return;
+  }
+  let qr;
+  try{ qr = makeQR(payload, o.ecl); }
+  catch(e){
+    cv.hidden=true; $('#empty').hidden=false; dlBtns.forEach(b=>b.disabled=true); state.qr=null;
+    setStatus('bad','ข้อมูลยาวเกินกว่าที่ QR Code จะรองรับ', `ตอนนี้ ${new TextEncoder().encode(payload).length.toLocaleString()} ไบต์ ลองตัดข้อความให้สั้นลง หรือเลือกระดับแก้ไขข้อผิดพลาด L (ภาษาไทย 1 ตัวอักษรใช้ 3 ไบต์)`); return;
+  }
+  cv.hidden=false; $('#empty').hidden=true; dlBtns.forEach(b=>b.disabled=false);
+  const sc = scene(qr,o);
+  state.qr=qr; state.sc=sc; state.opts=o;
+  paint(cv, sc, o, 660);
+  cv.setAttribute('aria-label','QR Code ของ: '+payload.slice(0,120));
+  $('#mVer').textContent = qr.version;
+  $('#mMod').textContent = qr.n+'×'+qr.n;
+  $('#mEcc').textContent = o.ecl + (val('ecl')==='auto'?' ·อัตโนมัติ':'');
+  $('#mBytes').textContent = qr.bytes.length.toLocaleString()+' B';
+  // warnings
+  const w=[];
+  const ink = o.eyeCustom ? [o.fg,o.eyeFrame,o.eyeCenter] : (o.grad!=='none'?[o.fg,o.fg2]:[o.fg]);
+  const base = o.transparent ? '#FFFFFF' : o.bg;
+  const minC = Math.min(...ink.map(c=>contrast(c,base)));
+  if(minC<3) w.push(`สีลายกับพื้นหลังต่างกันน้อย (คอนทราสต์ ${minC.toFixed(1)}:1) ควรมีอย่างน้อย 4:1 เพื่อให้สแกนง่าย`);
+  if(!o.transparent && lum(o.fg)>lum(o.bg)) w.push('ลายสีอ่อนบนพื้นเข้ม (สีกลับด้าน) แอปสแกนบางตัวอ่านไม่ได้');
+  if(o.transparent) w.push('พื้นหลังโปร่งใส ควรวางบนพื้นสีอ่อนเท่านั้น');
+  if(o.margin<2) w.push('ขอบว่างน้อยกว่า 2 โมดูล อาจสแกนยากเมื่อวางชิดลวดลายอื่น');
+  if(o.logo && (o.ecl==='L'||o.ecl==='M')) w.push(`ใส่โลโก้กับระดับ ${o.ecl} มีโอกาสสแกนไม่ติด แนะนำระดับ H`);
+  if(o.logo && o.logoSize+o.logoPad*2/qr.n>0.34) w.push('โลโก้และขอบรอบโลโก้ค่อนข้างใหญ่ ลองลดขนาดลง');
+  $('#warns').innerHTML = w.map(x=>`<li>${esc(x)}</li>`).join('');
+  clearTimeout(state.verifyTimer);
+  setStatus('wait','กำลังตรวจการสแกน…');
+  state.verifyTimer = setTimeout(verify, 220);
+}
+
+/* scan self-test with jsQR on the rendered image */
+const vc = document.createElement('canvas');
+function verify(){
+  if(!state.qr) return;
+  if(typeof jsQR!=='function'){ setStatus('warn','ไม่สามารถทดสอบการสแกนได้','โหลดตัวทดสอบไม่สำเร็จ ลองสแกนด้วยมือถือก่อนนำไปใช้'); return; }
+  const {sc,opts:o,qr} = state;
+  const sizes=[360, 260, 200, 520];
+  let ok=false;
+  for(const W of sizes){
+    paint(vc, sc, o, W, {forceBg:'#FFFFFF'});
+    const pad=document.createElement('canvas'); pad.width=vc.width+40; pad.height=vc.height+40;
+    const px=pad.getContext('2d',{willReadFrequently:true}); px.fillStyle='#FFFFFF'; px.fillRect(0,0,pad.width,pad.height); px.drawImage(vc,20,20);
+    const id = px.getImageData(0,0,pad.width,pad.height);
+    const res = jsQR(id.data, id.width, id.height, {inversionAttempts:'attemptBoth'});
+    if(res && res.binaryData.length===qr.bytes.length && res.binaryData.every((b,i)=>b===qr.bytes[i])){ ok=true; break; }
+  }
+  if(ok) setStatus('ok','สแกนได้','ทดสอบอ่านภาพนี้ด้วยตัวอ่าน QR แล้ว ได้ข้อมูลตรงกันทุกไบต์');
+  else setStatus('bad','ตัวทดสอบอ่านไม่ออก','ลองลดขนาดโลโก้ ใช้สีที่ต่างกันชัดเจนขึ้น ใช้ลายสี่เหลี่ยม หรือเลือกระดับแก้ไขข้อผิดพลาด H แล้วทดสอบด้วยมือถือจริง');
+}
+
+/* ---------- logo ---------- */
+function setLogo(src, name){
+  const im = new Image();
+  im.onload = () => { state.logoImg=im; state.logoSrc=src; state.logoName=name;
+    $('#logoThumb').innerHTML=''; const t=new Image(); t.src=src; t.alt=''; $('#logoThumb').appendChild(t);
+    $('#logoTxt').textContent = name; $('#logoOpts').hidden=false; $('#logoRemove').hidden=false; schedule(); };
+  im.onerror = () => toast('เปิดไฟล์รูปนี้ไม่ได้ ลองใช้ PNG หรือ JPG');
+  im.src = src;
+}
+function readFile(file){
+  if(!file || !file.type.startsWith('image/')){ toast('รองรับเฉพาะไฟล์รูปภาพ'); return; }
+  if(file.size>8*1024*1024){ toast('ไฟล์ใหญ่เกิน 8 MB'); return; }
+  const fr=new FileReader(); fr.onload=()=>setLogo(fr.result, file.name); fr.readAsDataURL(file);
+}
+$('#logoFile').addEventListener('change', e=>{ readFile(e.target.files[0]); e.target.value=''; });
+const drop=$('#drop');
+['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over');}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over');}));
+drop.addEventListener('drop', e=>readFile(e.dataTransfer.files[0]));
+document.addEventListener('paste', e=>{ const it=[...(e.clipboardData?.items||[])].find(i=>i.type.startsWith('image/')); if(it){ e.preventDefault(); readFile(it.getAsFile()); } });
+$('#logoRemove').addEventListener('click', ()=>{ state.logoImg=null; state.logoSrc=null;
+  $('#logoThumb').innerHTML='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg>';
+  $('#logoTxt').textContent='ลากไฟล์รูปมาวาง วางจากคลิปบอร์ด (Ctrl+V) หรือเลือกไฟล์ PNG, JPG, SVG'; $('#logoOpts').hidden=true; $('#logoRemove').hidden=true; schedule(); });
+$('#logoSample').addEventListener('click', ()=>{
+  const fg=val('fg');
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" fill="${fg}"/><circle cx="50" cy="50" r="40" fill="none" stroke="#fff" stroke-width="3"/><path d="M50 22l8.2 17.5 19 2.3-14 13.1 3.6 18.8L50 64.4l-16.8 9.3 3.6-18.8-14-13.1 19-2.3z" fill="#fff"/></svg>`;
+  setLogo('data:image/svg+xml;base64,'+btoa(svg), 'โลโก้ตัวอย่าง (ดาว)');
+});
+
+/* ---------- colours ---------- */
+function pairColor(pick, hex){
+  const p=$('#'+pick), h=$('#'+hex);
+  p.addEventListener('input', ()=>{ h.value=p.value.toUpperCase(); });
+  h.addEventListener('input', ()=>{ let v=h.value.trim(); if(!v.startsWith('#')) v='#'+v; if(/^#[0-9a-f]{6}$/i.test(v)){ p.value=v.toLowerCase(); schedule(); } });
+  h.addEventListener('blur', ()=>{ h.value=p.value.toUpperCase(); });
+}
+pairColor('fg','fgHex'); pairColor('bg','bgHex'); pairColor('fg2','fg2Hex'); pairColor('eyeFrameC','eyeFrameHex'); pairColor('eyeCenterC','eyeCenterHex');
+const setColor=(pick,hex,v)=>{ $('#'+pick).value=v; $('#'+hex).value=v.toUpperCase(); };
+const PRESETS=[
+  ['คลาสสิก','#000000','#ffffff',null],
+  ['เขียวหัวเป็ด','#0f3d3a','#ffffff','#0f766e'],
+  ['น้ำเงินกรม','#1e2a78','#ffffff','#3b5bdb'],
+  ['แดงอิฐ','#8a1c12','#fff7f2',null],
+  ['ม่วงเข้ม','#4c1d95','#faf5ff','#be185d'],
+  ['ทองบนดำ','#e8c36a','#141414',null],
+  ['ส้มพระอาทิตย์','#c2410c','#fffbeb','#b91c1c'],
+  ['เทาชนวน','#334155','#f1f5f9',null],
+];
+$('#presets').innerHTML = PRESETS.map(([n,f,b,g],i)=>`<button type="button" class="sw" data-i="${i}" title="${n}" aria-label="ชุดสี ${n}"><i style="background:${b}"></i><i style="background:${g?`linear-gradient(135deg,${f},${g})`:f}"></i></button>`).join('');
+$('#presets').addEventListener('click', e=>{ const b=e.target.closest('.sw'); if(!b) return; const [,f,bg,g]=PRESETS[+b.dataset.i];
+  setColor('fg','fgHex',f); setColor('bg','bgHex',bg);
+  if(g){ setColor('fg2','fg2Hex',g); if(val('grad')==='none') $('#grad').value='d'; } else $('#grad').value='none';
+  $('#transparent').checked=false; schedule(); });
+
+/* ---------- build pickers ---------- */
+buildChips($('#dotStyles'),'dot',DOTS,'dot','rounded');
+buildChips($('#eyeStyles'),'eye',EYES,'eye','rounded');
+buildChips($('#centerStyles'),'center',CENTERS,'center','rounded');
+$('#form').addEventListener('input', schedule);
+$('#form').addEventListener('change', schedule);
+
+/* ---------- export ---------- */
+const dlCap = (window.claude && typeof window.claude.use==='function') ? window.claude.use('downloads').catch(()=>null) : Promise.resolve(null);
+let toastT=0;
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),2600); }
+function fileBase(){
+  const map={url:'link',text:'text',wifi:'wifi',promptpay:'promptpay',email:'email',tel:'phone',sms:'sms',vcard:'contact',geo:'location'};
+  return 'qr-'+map[document.querySelector('input[name=type]:checked').value];
+}
+function rasterBlob(fmt){
+  const {sc,opts:o}=state; const c=document.createElement('canvas');
+  const mime = fmt==='jpg'?'image/jpeg':fmt==='webp'?'image/webp':'image/png';
+  paint(c, sc, o, o.size, {forceBg: fmt==='jpg' ? '#FFFFFF' : null});
+  return new Promise(res=>c.toBlob(res, mime, .95));
+}
+async function exportAs(fmt){
+  if(!state.qr) return;
+  const blob = fmt==='svg' ? new Blob([toSVG(state.sc,state.opts)],{type:'image/svg+xml'}) : await rasterBlob(fmt);
+  const name = `${fileBase()}.${fmt}`;
+  const dl = await dlCap;
+  if(dl){
+    try{ await dl.save({filename:name, data:blob}); toast('บันทึก '+name+' แล้ว'); }
+    catch(e){ if(e && e.code==='declined') return; if(e && e.code==='rate_limited'){ toast('มีหน้าต่างบันทึกเปิดอยู่ ลองอีกครั้งในอีกสักครู่'); return; } toast('บันทึกไฟล์ในหน้านี้ไม่ได้'); }
+    return;
+  }
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 4000); toast('ดาวน์โหลด '+name+' แล้ว');
+}
+document.querySelectorAll('.dl .btn').forEach(b=>b.addEventListener('click',()=>exportAs(b.dataset.fmt)));
+$('#copyText').addEventListener('click', ()=>{
+  navigator.clipboard?.writeText(state.payload).then(()=>toast('คัดลอกข้อมูลแล้ว'), ()=>{
+    const r=document.createRange(); r.selectNodeContents($('#payload')); const s=getSelection(); s.removeAllRanges(); s.addRange(r);
+    $('#payload').closest('details').open=true; toast('เลือกข้อความไว้แล้ว กด Ctrl+C เพื่อคัดลอก'); });
+});
+$('#copyImg').addEventListener('click', ()=>{
+  if(!state.qr) return;
+  if(!window.ClipboardItem || !navigator.clipboard?.write){ toast('เบราว์เซอร์นี้คัดลอกรูปไม่ได้ ใช้ปุ่ม PNG แทน'); return; }
+  const c=document.createElement('canvas'); paint(c,state.sc,state.opts,Math.min(state.opts.size,1024));
+  const p=new Promise(res=>c.toBlob(res,'image/png'));
+  navigator.clipboard.write([new ClipboardItem({'image/png':p})]).then(()=>toast('คัดลอกรูปแล้ว วางในแชตหรือเอกสารได้เลย'), ()=>toast('เบราว์เซอร์ไม่อนุญาตให้คัดลอกรูป ใช้ปุ่ม PNG แทน'));
+});
+
+render();
+if(document.fonts) document.fonts.ready.then(schedule);
+})();
+</script>
+
+</body>
+</html>
